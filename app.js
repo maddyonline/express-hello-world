@@ -1,77 +1,34 @@
-require('dotenv').config()
+const express = require('express')
+const http = require('http')
+const socketIO = require('socket.io')
 
-const express = require("express");
-
-var bodyParser = require('body-parser');
-
-var jsonParser = bodyParser.json();
-
-const app = express();
-var http = require('http').createServer(app);
-var io = require('socket.io')(http);
-
-// var cors = require('cors');
-// var whitelist = ['http://localhost:3000', 'https://socket-sync.onrender.com']
-// var corsOptions = {
-//   origin: function (origin, callback) {
-//     if (whitelist.indexOf(origin) !== -1) {
-//       callback(null, true)
-//     } else {
-//       callback(new Error('Not allowed by CORS'))
-//     }
-//   },
-//   credentials: true,
-// }
-
-// app.use(cors(corsOptions));
-
+// our localhost port
 const port = process.env.PORT || 3001;
 
+const app = express()
 
+// our server instance
+const server = http.createServer(app)
 
-const newId = () => Math.random().toString(36).substr(2, 9);
+// This creates our socket using the instance of the server
+const io = socketIO(server)
 
-console.log('The value of secret is', process.env.SECRET);
+// This is what the socket.io syntax is like, we will work this later
+io.on('connection', socket => {
+  console.log('New client connected')
 
-var activeSessions = {};
+  // just like on the client side, we have a socket.on method that takes a callback function
+  socket.on('change color', (color) => {
+    // once we get a 'change color' event from one of our clients, we will send it to the rest of the clients
+    // we make use of the socket.emit method again with the argument given to use from the callback function above
+    console.log('Color Changed to: ', color)
+    io.sockets.emit('change color', color)
+  })
 
-io.on('connection', function (socket) {
-    console.log('a user connected');
-});
-
-app.post('/api/sessions', jsonParser, function (req, res) {
-    console.log('got request')
-    const action = req.body.action;
-    switch (action) {
-        case "new": {
-
-
-            const id = newId();
-            activeSessions[id] = {
-                claimed: false,
-            }
-            res.send({ id: id })
-            break;
-        }
-        case "claim": {
-            const id = req.body.id;
-            if (id && activeSessions[id] && !activeSessions[id].claimed) {
-                activeSessions[id].claimed = true;
-            }
-            res.send({ done: activeSessions[id].claimed })
-            break;
-        }
-        default: {
-            res.send({ message: "invalid" })
-        }
-    }
-    // create user in req.body
+  // disconnect is fired when a client leaves the server
+  socket.on('disconnect', () => {
+    console.log('user disconnected')
+  })
 })
 
-app.get("/", (req, res) => res.send("Hello from Render!"));
-
-app.get("/claim", (req, res) => {
-
-});
-
-app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+server.listen(port, () => console.log(`Listening on port ${port}`))
